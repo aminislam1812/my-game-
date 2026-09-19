@@ -1,0 +1,2678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width, initial-scale=1.0,
+               maximum-scale=1.0, user-scalable=no">
+
+<title>ULTRA IMPOSSIBLE - Pixel Quest</title>
+
+<style>
+
+html, body {
+    margin: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    background: #091226;
+    font-family: Arial, sans-serif;
+}
+
+canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    background: #16284d;
+}
+
+/* HUD */
+
+#hud {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    right: 10px;
+
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+
+    z-index: 10;
+    pointer-events: none;
+}
+
+.box {
+    background: rgba(0,0,0,.65);
+    color: white;
+
+    padding: 8px 12px;
+
+    border: 2px solid white;
+    border-radius: 10px;
+
+    font-weight: bold;
+}
+
+/* MENU */
+
+#menu {
+    position: fixed;
+    inset: 0;
+
+    background: rgba(0,0,0,.65);
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+
+    z-index: 20;
+}
+
+.panel {
+    background: #081020;
+    color: white;
+
+    padding: 28px;
+
+    border: 3px solid white;
+    border-radius: 18px;
+
+    text-align: center;
+
+    max-width: 560px;
+}
+
+.panel h1 {
+    color: #ffe34a;
+}
+
+.panel button {
+    padding: 12px 22px;
+
+    font-size: 18px;
+    font-weight: bold;
+
+    border: none;
+    border-radius: 10px;
+
+    background: #3ee67b;
+    color: #062310;
+
+    cursor: pointer;
+}
+
+/* MOBILE CONTROLS */
+
+.ctrl {
+    position: fixed;
+    bottom: 18px;
+
+    z-index: 15;
+
+    display: flex;
+    gap: 12px;
+}
+
+.left {
+    left: 18px;
+}
+
+.right {
+    right: 18px;
+}
+
+.ctrl button {
+    width: 68px;
+    height: 68px;
+
+    border-radius: 50%;
+
+    border: 3px solid white;
+
+    background: rgba(0,0,0,.55);
+    color: white;
+
+    font-size: 28px;
+
+    touch-action: none;
+}
+
+/* PAUSE */
+
+.pause {
+    position: fixed;
+
+    right: 18px;
+    bottom: 100px;
+
+    z-index: 15;
+
+    background: rgba(0,0,0,.7);
+    color: white;
+
+    border: 2px solid white;
+    border-radius: 8px;
+
+    padding: 8px 12px;
+}
+
+</style>
+</head>
+
+<body>
+
+<canvas id="c"></canvas>
+
+
+<!-- HUD -->
+
+<div id="hud">
+
+    <div class="box">
+        ❤️ <span id="lives">1</span>
+    </div>
+
+    <div class="box">
+        ⭐ <span id="score">0</span>
+    </div>
+
+    <div class="box">
+        🏁 Level <span id="lvl">1</span>/10
+    </div>
+
+    <div class="box">
+        ⏱️ <span id="time">180</span>
+    </div>
+
+</div>
+
+
+<!-- PAUSE -->
+
+<button class="pause" id="pause">
+    PAUSE
+</button>
+
+
+<!-- MOBILE CONTROLS -->
+
+<div class="ctrl left">
+
+    <button id="L">
+        ◀
+    </button>
+
+    <button id="R">
+        ▶
+    </button>
+
+</div>
+
+
+<div class="ctrl right">
+
+    <button id="J">
+        ▲
+    </button>
+
+</div>
+
+
+<!-- START MENU -->
+
+<div id="menu">
+
+    <div class="panel">
+
+        <h1 id="title">
+            ULTRA IMPOSSIBLE
+        </h1>
+
+        <p id="text">
+            10টি কঠিন level, spikes,
+            enemies, moving platforms
+            এবং final boss।
+        </p>
+
+        <button id="start">
+            START GAME
+        </button>
+
+    </div>
+
+</div>
+
+
+<script>
+
+/* =========================================================
+   CANVAS
+========================================================= */
+
+const canvas =
+    document.getElementById("c");
+
+const ctx =
+    canvas.getContext("2d");
+
+let W = 0;
+let H = 0;
+let DPR = 1;
+
+
+function resize() {
+
+    DPR =
+        window.devicePixelRatio || 1;
+
+    W = window.innerWidth;
+    H = window.innerHeight;
+
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+
+    canvas.style.width =
+        W + "px";
+
+    canvas.style.height =
+        H + "px";
+
+    ctx.setTransform(
+        DPR, 0, 0, DPR, 0, 0
+    );
+}
+
+
+window.addEventListener(
+    "resize",
+    resize
+);
+
+resize();
+
+
+/* =========================================================
+   INPUT
+========================================================= */
+
+const input = {
+
+    left: false,
+    right: false,
+    jump: false
+
+};
+
+
+function bindButton(id, key) {
+
+    const button =
+        document.getElementById(id);
+
+
+    button.addEventListener(
+        "pointerdown",
+        function(e) {
+
+            e.preventDefault();
+
+            input[key] = true;
+
+        }
+    );
+
+
+    button.addEventListener(
+        "pointerup",
+        function(e) {
+
+            e.preventDefault();
+
+            input[key] = false;
+
+        }
+    );
+
+
+    button.addEventListener(
+        "pointercancel",
+        function(e) {
+
+            e.preventDefault();
+
+            input[key] = false;
+
+        }
+    );
+
+
+    button.addEventListener(
+        "pointerleave",
+        function(e) {
+
+            input[key] = false;
+
+        }
+    );
+
+}
+
+
+bindButton("L", "left");
+bindButton("R", "right");
+bindButton("J", "jump");
+
+
+/* KEYBOARD */
+
+window.addEventListener(
+    "keydown",
+    function(e) {
+
+        if (
+            e.key === "ArrowLeft" ||
+            e.key.toLowerCase() === "a"
+        ) {
+
+            input.left = true;
+
+        }
+
+
+        if (
+            e.key === "ArrowRight" ||
+            e.key.toLowerCase() === "d"
+        ) {
+
+            input.right = true;
+
+        }
+
+
+        if (
+            e.key === "ArrowUp" ||
+            e.key.toLowerCase() === "w" ||
+            e.code === "Space"
+        ) {
+
+            if (!e.repeat) {
+
+                input.jump = true;
+
+            }
+
+        }
+
+
+        if (
+            e.key.toLowerCase() === "p"
+        ) {
+
+            togglePause();
+
+        }
+
+    }
+);
+
+
+window.addEventListener(
+    "keyup",
+    function(e) {
+
+        if (
+            e.key === "ArrowLeft" ||
+            e.key.toLowerCase() === "a"
+        ) {
+
+            input.left = false;
+
+        }
+
+
+        if (
+            e.key === "ArrowRight" ||
+            e.key.toLowerCase() === "d"
+        ) {
+
+            input.right = false;
+
+        }
+
+
+        if (
+            e.key === "ArrowUp" ||
+            e.key.toLowerCase() === "w" ||
+            e.code === "Space"
+        ) {
+
+            input.jump = false;
+
+        }
+
+    }
+);
+
+
+/* =========================================================
+   GAME VARIABLES
+========================================================= */
+
+const levelLengths = [
+
+    3200,
+    3800,
+    4300,
+    4800,
+    5300,
+    5800,
+    6300,
+    6800,
+    7300,
+    7800
+
+];
+
+
+let level = 1;
+
+let score = 0;
+
+let lives = 1;
+
+let timeLeft = 180;
+
+let playing = false;
+
+let paused = false;
+
+let camera = 0;
+
+let world;
+
+let player;
+
+let checkpoint = 80;
+
+let boss = null;
+
+
+/* =========================================================
+   OBJECT CREATOR
+========================================================= */
+
+function makeRect(
+    x,
+    y,
+    w,
+    h,
+    kind = "solid",
+    extra = {}
+) {
+
+    return {
+
+        x,
+        y,
+        w,
+        h,
+        kind,
+
+        ...extra
+
+    };
+
+}
+
+
+/* =========================================================
+   COLLISION
+========================================================= */
+
+function overlap(a, b) {
+
+    return (
+
+        a.x < b.x + b.w &&
+
+        a.x + a.w > b.x &&
+
+        a.y < b.y + b.h &&
+
+        a.y + a.h > b.y
+
+    );
+
+}
+
+
+/* =========================================================
+   BUILD LEVEL
+========================================================= */
+
+function buildLevel(n) {
+
+    const length =
+        levelLengths[n - 1];
+
+
+    world = {
+
+        len: length,
+
+        solids: [],
+
+        spikes: [],
+
+        coins: [],
+
+        enemies: [],
+
+        moving: [],
+
+        checkpoints: [],
+
+        power: [],
+
+        goal: length - 120
+
+    };
+
+
+    boss = null;
+
+    checkpoint = 80;
+
+
+    player = {
+
+        x: 80,
+
+        y: 420,
+
+        w: 36,
+
+        h: 48,
+
+        vx: 0,
+
+        vy: 0,
+
+        on: false,
+
+        coyote: 0,
+
+        jumps: 0,
+
+        shield: 0,
+
+        inv: 0
+
+    };
+
+
+    /* Starting ground */
+
+    world.solids.push(
+        makeRect(
+            0,
+            520,
+            300,
+            120
+        )
+    );
+
+
+    let x = 300;
+
+    let seed =
+        n * 999;
+
+
+    function random() {
+
+        seed =
+            (
+                seed * 1664525 +
+                1013904223
+            ) >>> 0;
+
+        return seed / 4294967296;
+
+    }
+
+
+    /* =====================================================
+       GENERATE LEVEL
+    ===================================================== */
+
+    while (x < length - 400) {
+
+        const r = random();
+
+
+        /* SPIKES */
+
+        if (r < 0.18) {
+
+            world.spikes.push(
+                makeRect(
+                    x,
+                    486,
+                    35,
+                    34,
+                    "spike"
+                )
+            );
+
+
+            world.spikes.push(
+                makeRect(
+                    x + 38,
+                    486,
+                    35,
+                    34,
+                    "spike"
+                )
+            );
+
+
+            x += 150;
+
+        }
+
+
+        /* PLATFORM SECTION */
+
+        else if (r < 0.36) {
+
+            world.solids.push(
+                makeRect(
+                    x,
+                    520,
+                    110,
+                    120
+                )
+            );
+
+
+            world.solids.push(
+                makeRect(
+                    x + 145,
+                    420,
+                    90,
+                    20,
+                    "platform"
+                )
+            );
+
+
+            world.solids.push(
+                makeRect(
+                    x + 285,
+                    350,
+                    90,
+                    20,
+                    "platform"
+                )
+            );
+
+
+            world.coins.push({
+
+                x: x + 170,
+                y: 380,
+                got: false
+
+            });
+
+
+            world.coins.push({
+
+                x: x + 310,
+                y: 310,
+                got: false
+
+            });
+
+
+            x += 500;
+
+        }
+
+
+        /* MOVING PLATFORM */
+
+        else if (r < 0.52) {
+
+            const gap =
+                180 + n * 10;
+
+
+            world.solids.push(
+                makeRect(
+                    x,
+                    520,
+                    100,
+                    120
+                )
+            );
+
+
+            world.solids.push(
+                makeRect(
+                    x + gap + 100,
+                    520,
+                    160,
+                    120
+                )
+            );
+
+
+            world.moving.push({
+
+                x: x + 70,
+
+                y: 430,
+
+                w: 85,
+
+                h: 20,
+
+                base: x + 70,
+
+                range: gap,
+
+                speed: 1.5
+
+            });
+
+
+            x += gap + 330;
+
+        }
+
+
+        /* ENEMY SECTION */
+
+        else if (r < 0.68) {
+
+            world.solids.push(
+                makeRect(
+                    x,
+                    520,
+                    260,
+                    120
+                )
+            );
+
+
+            world.enemies.push({
+
+                x: x + 100,
+
+                y: 484,
+
+                w: 38,
+
+                h: 36,
+
+                vx: 1.3,
+
+                type: "walker",
+
+                base: x + 100,
+
+                vy: 0
+
+            });
+
+
+            world.enemies.push({
+
+                x: x + 210,
+
+                y: 484,
+
+                w: 38,
+
+                h: 36,
+
+                vx: 2.4,
+
+                type: "fast",
+
+                base: x + 210,
+
+                vy: 0
+
+            });
+
+
+            x += 320;
+
+        }
+
+
+        /* JUMPER */
+
+        else if (r < 0.82) {
+
+            world.solids.push(
+                makeRect(
+                    x,
+                    520,
+                    100,
+                    120
+                )
+            );
+
+
+            world.spikes.push(
+                makeRect(
+                    x + 105,
+                    486,
+                    35,
+                    34,
+                    "spike"
+                )
+            );
+
+
+            world.solids.push(
+                makeRect(
+                    x + 170,
+                    400,
+                    100,
+                    20,
+                    "platform"
+                )
+            );
+
+
+            world.enemies.push({
+
+                x: x + 190,
+
+                y: 364,
+
+                w: 38,
+
+                h: 36,
+
+                vx: 1.6,
+
+                type: "jumper",
+
+                base: x + 190,
+
+                vy: 0,
+
+                jump: 0
+
+            });
+
+
+            world.coins.push({
+
+                x: x + 210,
+
+                y: 350,
+
+                got: false
+
+            });
+
+
+            x += 390;
+
+        }
+
+
+        /* CHASER */
+
+        else {
+
+            world.solids.push(
+                makeRect(
+                    x,
+                    520,
+                    300,
+                    120
+                )
+            );
+
+
+            world.enemies.push({
+
+                x: x + 70,
+
+                y: 484,
+
+                w: 38,
+
+                h: 36,
+
+                vx: 1.5,
+
+                type: "chaser",
+
+                base: x + 70,
+
+                vy: 0
+
+            });
+
+
+            if (n >= 5) {
+
+                for (
+                    let i = 0;
+                    i < 3;
+                    i++
+                ) {
+
+                    world.spikes.push(
+                        makeRect(
+                            x + 130 + i * 38,
+                            486,
+                            35,
+                            34,
+                            "spike"
+                        )
+                    );
+
+                }
+
+            }
+
+
+            x += 360;
+
+        }
+
+
+        /* POWER UP */
+
+        if (
+            n >= 6 &&
+            random() < 0.45
+        ) {
+
+            world.power.push({
+
+                x: x - 80,
+
+                y: 440,
+
+                got: false
+
+            });
+
+        }
+
+
+        /* CHECKPOINT */
+
+        if (
+            n >= 3 &&
+            random() < 0.35
+        ) {
+
+            world.checkpoints.push({
+
+                x: x - 100,
+
+                active: false
+
+            });
+
+        }
+
+    }
+
+
+    /* FINAL GROUND */
+
+    world.solids.push(
+        makeRect(
+            length - 400,
+            520,
+            400,
+            120
+        )
+    );
+
+
+    world.solids.push(
+        makeRect(
+            length - 330,
+            430,
+            90,
+            20,
+            "platform"
+        )
+    );
+
+
+    world.solids.push(
+        makeRect(
+            length - 210,
+            350,
+            90,
+            20,
+            "platform"
+        )
+    );
+
+
+    world.coins.push({
+
+        x: length - 290,
+
+        y: 390,
+
+        got: false
+
+    });
+
+
+    world.coins.push({
+
+        x: length - 170,
+
+        y: 310,
+
+        got: false
+
+    });
+
+
+    /* =====================================================
+       FINAL BOSS
+    ===================================================== */
+
+    if (n === 10) {
+
+        boss = {
+
+            x: length - 500,
+
+            y: 390,
+
+            w: 110,
+
+            h: 100,
+
+            hp: 100,
+
+            t: 0,
+
+            vx: 1.4,
+
+            shots: []
+
+        };
+
+    }
+
+    else {
+
+        world.solids.push(
+            makeRect(
+                length - 120,
+                410,
+                20,
+                110,
+                "goal"
+            )
+        );
+
+    }
+
+
+    /* EXTRA COINS */
+
+    for (
+        let i = 0;
+        i < 8 + n;
+        i++
+    ) {
+
+        const cx =
+            400 +
+            random() *
+            (length - 800);
+
+        const cy =
+            280 +
+            random() *
+            180;
+
+
+        world.coins.push({
+
+            x: cx,
+
+            y: cy,
+
+            got: false
+
+        });
+
+    }
+
+}
+
+
+/* =========================================================
+   RESET GAME
+========================================================= */
+
+function resetGame() {
+
+    level = 1;
+
+    score = 0;
+
+    lives = 1;
+
+    timeLeft = 180;
+
+    playing = true;
+
+    paused = false;
+
+    hideMenu();
+
+    buildLevel(level);
+
+}
+
+
+/* =========================================================
+   RESPAWN
+========================================================= */
+
+function respawn() {
+
+    player.x =
+        checkpoint;
+
+    player.y =
+        350;
+
+    player.vx = 0;
+
+    player.vy = 0;
+
+    player.inv = 90;
+
+}
+
+
+/* =========================================================
+   DAMAGE
+========================================================= */
+
+function hurt() {
+
+    if (player.inv > 0)
+        return;
+
+
+    /* SHIELD */
+
+    if (player.shield > 0) {
+
+        player.shield = 0;
+
+        player.inv = 60;
+
+        return;
+
+    }
+
+
+    lives--;
+
+
+    if (lives <= 0) {
+
+        gameOver();
+
+        return;
+
+    }
+
+
+    respawn();
+
+}
+
+
+/* =========================================================
+   PHYSICS
+========================================================= */
+
+function updatePhysics() {
+
+    if (!playing || paused)
+        return;
+
+
+    const speed =
+        level >= 7 ? 7 : 6;
+
+
+    /* MOVEMENT */
+
+    if (input.left)
+        player.vx -= .65;
+
+
+    if (input.right)
+        player.vx += .65;
+
+
+    if (
+        !input.left &&
+        !input.right
+    ) {
+
+        player.vx *= .82;
+
+    }
+
+
+    player.vx =
+        Math.max(
+            -speed,
+            Math.min(
+                speed,
+                player.vx
+            )
+        );
+
+
+    /* COYOTE TIME */
+
+    if (player.on)
+        player.coyote = 8;
+    else
+        player.coyote--;
+
+
+    /* JUMP */
+
+    if (
+        input.jump &&
+        player.jumps < 1 &&
+        (
+            player.on ||
+            player.coyote > 0
+        )
+    ) {
+
+        player.vy = -14;
+
+        player.jumps = 1;
+
+        input.jump = false;
+
+    }
+
+
+    /* GRAVITY */
+
+    player.vy += .72;
+
+    if (player.vy > 18)
+        player.vy = 18;
+
+
+    player.x += player.vx;
+
+    player.y += player.vy;
+
+
+    /* BOUNDARY */
+
+    if (player.x < 0)
+        player.x = 0;
+
+
+    if (
+        player.x >
+        world.len - player.w
+    ) {
+
+        player.x =
+            world.len - player.w;
+
+    }
+
+
+    /* GROUND */
+
+    player.on = false;
+
+
+    const platforms = [
+
+        ...world.solids,
+
+        ...world.moving
+
+    ];
+
+
+    for (const s of platforms) {
+
+        if (
+
+            player.x + player.w > s.x &&
+
+            player.x < s.x + s.w &&
+
+            player.y + player.h >= s.y &&
+
+            player.y + player.h <=
+                s.y + 18 &&
+
+            player.vy >= 0
+
+        ) {
+
+            player.y =
+                s.y - player.h;
+
+            player.vy = 0;
+
+            player.on = true;
+
+            player.jumps = 0;
+
+        }
+
+    }
+
+
+    /* SPIKES */
+
+    for (const s of world.spikes) {
+
+        if (overlap(player, s)) {
+
+            hurt();
+
+        }
+
+    }
+
+
+    /* COINS */
+
+    for (const c of world.coins) {
+
+        if (c.got)
+            continue;
+
+
+        const coinBox = {
+
+            x: c.x - 10,
+
+            y: c.y - 10,
+
+            w: 20,
+
+            h: 20
+
+        };
+
+
+        if (
+            overlap(
+                player,
+                coinBox
+            )
+        ) {
+
+            c.got = true;
+
+            score += 10;
+
+        }
+
+    }
+
+
+    /* SHIELD */
+
+    for (const p of world.power) {
+
+        if (p.got)
+            continue;
+
+
+        const powerBox = {
+
+            x: p.x,
+
+            y: p.y,
+
+            w: 28,
+
+            h: 28
+
+        };
+
+
+        if (
+            overlap(
+                player,
+                powerBox
+            )
+        ) {
+
+            p.got = true;
+
+            player.shield = 600;
+
+        }
+
+    }
+
+
+    /* CHECKPOINT */
+
+    for (
+        const cp of
+        world.checkpoints
+    ) {
+
+        if (
+            !cp.active &&
+            player.x > cp.x
+        ) {
+
+            cp.active = true;
+
+            checkpoint =
+                cp.x + 25;
+
+            score += 50;
+
+        }
+
+    }
+
+
+    /* ENEMIES */
+
+    for (
+        const enemy of
+        world.enemies
+    ) {
+
+        if (enemy.dead)
+            continue;
+
+
+        /* CHASER */
+
+        if (
+            enemy.type === "chaser" &&
+            Math.abs(
+                player.x - enemy.x
+            ) < 450
+        ) {
+
+            enemy.vx =
+                player.x > enemy.x
+                ? 2.7
+                : -2.7;
+
+        }
+
+
+        enemy.x +=
+            enemy.vx;
+
+
+        if (
+            Math.abs(
+                enemy.x -
+                enemy.base
+            ) > 180
+        ) {
+
+            enemy.vx *= -1;
+
+        }
+
+
+        /* JUMPER */
+
+        if (
+            enemy.type === "jumper"
+        ) {
+
+            enemy.jump++;
+
+
+            if (
+                enemy.jump > 80
+            ) {
+
+                enemy.vy = -10;
+
+                enemy.jump = 0;
+
+            }
+
+
+            enemy.y +=
+                enemy.vy;
+
+            enemy.vy += .6;
+
+
+            if (
+                enemy.y > 484
+            ) {
+
+                enemy.y = 484;
+
+                enemy.vy = 0;
+
+            }
+
+        }
+
+
+        /* COLLISION */
+
+        if (
+            overlap(
+                player,
+                enemy
+            )
+        ) {
+
+            if (
+                player.vy > 0 &&
+                player.y +
+                player.h <
+                enemy.y + 18
+            ) {
+
+                enemy.dead = true;
+
+                score += 50;
+
+                player.vy = -9;
+
+            }
+            else {
+
+                hurt();
+
+            }
+
+        }
+
+    }
+
+
+    /* MOVING PLATFORMS */
+
+    for (
+        const p of
+        world.moving
+    ) {
+
+        p.x +=
+            p.speed;
+
+
+        if (
+            Math.abs(
+                p.x - p.base
+            ) > p.range
+        ) {
+
+            p.speed *= -1;
+
+        }
+
+    }
+
+
+    /* FALL */
+
+    if (player.y > 700) {
+
+        hurt();
+
+    }
+
+
+    /* INVINCIBILITY */
+
+    if (player.inv > 0)
+        player.inv--;
+
+
+    if (player.shield > 0)
+        player.shield--;
+
+
+    /* BOSS */
+
+    if (level === 10)
+        updateBoss();
+
+
+    /* NEXT LEVEL */
+
+    if (
+        level < 10 &&
+        player.x > world.goal
+    ) {
+
+        score += 500;
+
+        level++;
+
+        timeLeft =
+            Math.max(
+                90,
+                180 - level * 5
+            );
+
+        buildLevel(level);
+
+        showMenu(
+            "LEVEL " + level,
+            "Level " +
+            level +
+            " শুরু!",
+            "CONTINUE"
+        );
+
+    }
+
+
+    /* FINAL WIN */
+
+    if (
+        level === 10 &&
+        !boss &&
+        player.x >
+        world.len - 160
+    ) {
+
+        winGame();
+
+    }
+
+}
+
+
+/* =========================================================
+   BOSS
+========================================================= */
+
+function updateBoss() {
+
+    if (!boss)
+        return;
+
+
+    boss.t++;
+
+
+    boss.x +=
+        boss.vx;
+
+
+    if (
+        boss.x >
+        world.len - 250 ||
+        boss.x <
+        world.len - 750
+    ) {
+
+        boss.vx *= -1;
+
+    }
+
+
+    /* SHOOT */
+
+    if (boss.t > 80) {
+
+        boss.t = 0;
+
+
+        boss.shots.push({
+
+            x: boss.x,
+
+            y: boss.y + 45,
+
+            vx: -5,
+
+            vy:
+                (
+                    player.y -
+                    boss.y
+                ) / 100
+
+        });
+
+    }
+
+
+    /* PROJECTILES */
+
+    for (
+        let i =
+        boss.shots.length - 1;
+
+        i >= 0;
+
+        i--
+    ) {
+
+        const shot =
+            boss.shots[i];
+
+
+        shot.x +=
+            shot.vx;
+
+        shot.y +=
+            shot.vy;
+
+
+        const box = {
+
+            x: shot.x,
+
+            y: shot.y,
+
+            w: 20,
+
+            h: 20
+
+        };
+
+
+        if (
+            overlap(
+                player,
+                box
+            )
+        ) {
+
+            hurt();
+
+            boss.shots.splice(
+                i,
+                1
+            );
+
+            continue;
+
+        }
+
+
+        if (
+            shot.x <
+            camera - 100
+        ) {
+
+            boss.shots.splice(
+                i,
+                1
+            );
+
+        }
+
+    }
+
+
+    /* PLAYER VS BOSS */
+
+    if (
+        overlap(
+            player,
+            boss
+        )
+    ) {
+
+        if (
+            player.vy > 0 &&
+            player.y +
+            player.h <
+            boss.y + 35
+        ) {
+
+            boss.hp -= 10;
+
+            player.vy = -12;
+
+
+            if (
+                boss.hp <= 0
+            ) {
+
+                boss = null;
+
+                score += 1000;
+
+            }
+
+        }
+        else {
+
+            hurt();
+
+        }
+
+    }
+
+}
+
+
+/* =========================================================
+   DRAW
+========================================================= */
+
+function draw() {
+
+    ctx.clearRect(
+        0,
+        0,
+        W,
+        H
+    );
+
+
+    /* SKY */
+
+    const bg =
+        ctx.createLinearGradient(
+            0,
+            0,
+            0,
+            H
+        );
+
+
+    bg.addColorStop(
+        0,
+        "#101b38"
+    );
+
+
+    bg.addColorStop(
+        1,
+        "#294873"
+    );
+
+
+    ctx.fillStyle = bg;
+
+    ctx.fillRect(
+        0,
+        0,
+        W,
+        H
+    );
+
+
+    /* CAMERA */
+
+    if (world) {
+
+        camera =
+            Math.max(
+                0,
+                Math.min(
+                    world.len - W,
+                    player.x -
+                    W * .35
+                )
+            );
+
+    }
+
+
+    ctx.save();
+
+
+    ctx.translate(
+        -camera,
+        0
+    );
+
+
+    /* BACKGROUND */
+
+    ctx.fillStyle =
+        "#0d1730";
+
+
+    for (
+        let i = 0;
+        i < world.len;
+        i += 180
+    ) {
+
+        ctx.fillRect(
+            i,
+            470,
+            90,
+            50
+        );
+
+    }
+
+
+    /* SOLIDS */
+
+    for (
+        const s of world.solids
+    ) {
+
+        ctx.fillStyle =
+            s.kind === "platform"
+            ? "#d18b28"
+            : "#455d75";
+
+
+        ctx.fillRect(
+            s.x,
+            s.y,
+            s.w,
+            s.h
+        );
+
+
+        ctx.fillStyle =
+            "#718da5";
+
+
+        ctx.fillRect(
+            s.x,
+            s.y,
+            s.w,
+            5
+        );
+
+    }
+
+
+    /* MOVING */
+
+    for (
+        const p of
+        world.moving
+    ) {
+
+        ctx.fillStyle =
+            "#e0529a";
+
+
+        ctx.fillRect(
+            p.x,
+            p.y,
+            p.w,
+            p.h
+        );
+
+    }
+
+
+    /* SPIKES */
+
+    for (
+        const s of
+        world.spikes
+    ) {
+
+        ctx.fillStyle =
+            "#ff3e62";
+
+
+        ctx.beginPath();
+
+        ctx.moveTo(
+            s.x,
+            s.y + s.h
+        );
+
+        ctx.lineTo(
+            s.x + s.w / 2,
+            s.y
+        );
+
+        ctx.lineTo(
+            s.x + s.w,
+            s.y + s.h
+        );
+
+        ctx.fill();
+
+    }
+
+
+    /* COINS */
+
+    for (
+        const c of
+        world.coins
+    ) {
+
+        if (c.got)
+            continue;
+
+
+        ctx.fillStyle =
+            "#ffd52a";
+
+
+        ctx.beginPath();
+
+
+        ctx.arc(
+            c.x,
+            c.y,
+            10,
+            0,
+            Math.PI * 2
+        );
+
+
+        ctx.fill();
+
+
+        ctx.strokeStyle =
+            "#a87500";
+
+
+        ctx.stroke();
+
+    }
+
+
+    /* CHECKPOINTS */
+
+    for (
+        const cp of
+        world.checkpoints
+    ) {
+
+        ctx.fillStyle =
+            "#eeeeee";
+
+
+        ctx.fillRect(
+            cp.x,
+            430,
+            8,
+            90
+        );
+
+
+        ctx.fillStyle =
+            cp.active
+            ? "#36e67b"
+            : "#f0b83a";
+
+
+        ctx.beginPath();
+
+
+        ctx.moveTo(
+            cp.x + 8,
+            430
+        );
+
+
+        ctx.lineTo(
+            cp.x + 55,
+            448
+        );
+
+
+        ctx.lineTo(
+            cp.x + 8,
+            466
+        );
+
+
+        ctx.fill();
+
+    }
+
+
+    /* SHIELD POWER */
+
+    for (
+        const p of
+        world.power
+    ) {
+
+        if (p.got)
+            continue;
+
+
+        ctx.fillStyle =
+            "#39d9ff";
+
+
+        ctx.beginPath();
+
+
+        ctx.arc(
+            p.x + 14,
+            p.y + 14,
+            14,
+            0,
+            Math.PI * 2
+        );
+
+
+        ctx.fill();
+
+
+        ctx.strokeStyle =
+            "#ffffff";
+
+
+        ctx.stroke();
+
+    }
+
+
+    /* ENEMIES */
+
+    for (
+        const enemy of
+        world.enemies
+    ) {
+
+        if (enemy.dead)
+            continue;
+
+
+        if (
+            enemy.type ===
+            "chaser"
+        ) {
+
+            ctx.fillStyle =
+                "#b33cff";
+
+        }
+
+        else if (
+            enemy.type ===
+            "fast"
+        ) {
+
+            ctx.fillStyle =
+                "#ffbd24";
+
+        }
+
+        else if (
+            enemy.type ===
+            "jumper"
+        ) {
+
+            ctx.fillStyle =
+                "#28caff";
+
+        }
+
+        else {
+
+            ctx.fillStyle =
+                "#ff5937";
+
+        }
+
+
+        ctx.fillRect(
+            enemy.x,
+            enemy.y,
+            enemy.w,
+            enemy.h
+        );
+
+
+        ctx.fillStyle =
+            "#ffffff";
+
+
+        ctx.fillRect(
+            enemy.x + 8,
+            enemy.y + 8,
+            7,
+            7
+        );
+
+
+        ctx.fillRect(
+            enemy.x + 24,
+            enemy.y + 8,
+            7,
+            7
+        );
+
+    }
+
+
+    /* BOSS */
+
+    if (boss) {
+
+        ctx.fillStyle =
+            "#8f3cff";
+
+
+        ctx.fillRect(
+            boss.x,
+            boss.y,
+            boss.w,
+            boss.h
+        );
+
+
+        ctx.fillStyle =
+            "#ffef48";
+
+
+        ctx.fillRect(
+            boss.x + 22,
+            boss.y + 24,
+            18,
+            18
+        );
+
+
+        ctx.fillRect(
+            boss.x + 70,
+            boss.y + 24,
+            18,
+            18
+        );
+
+
+        /* Boss shots */
+
+        for (
+            const shot of
+            boss.shots
+        ) {
+
+            ctx.fillStyle =
+                "#ff4b62";
+
+
+            ctx.beginPath();
+
+
+            ctx.arc(
+                shot.x + 10,
+                shot.y + 10,
+                10,
+                0,
+                Math.PI * 2
+            );
+
+
+            ctx.fill();
+
+        }
+
+    }
+
+
+    /* GOAL */
+
+    if (
+        level < 10
+    ) {
+
+        ctx.fillStyle =
+            "#ffffff";
+
+
+        ctx.fillRect(
+            world.goal,
+            410,
+            18,
+            110
+        );
+
+
+        ctx.fillStyle =
+            "#36e67b";
+
+
+        ctx.fillRect(
+            world.goal + 18,
+            415,
+            70,
+            28
+        );
+
+    }
+
+
+    /* PLAYER SHIELD */
+
+    if (
+        player.shield > 0
+    ) {
+
+        ctx.strokeStyle =
+            "#39d9ff";
+
+
+        ctx.lineWidth = 5;
+
+
+        ctx.beginPath();
+
+
+        ctx.arc(
+            player.x + 18,
+            player.y + 24,
+            30,
+            0,
+            Math.PI * 2
+        );
+
+
+        ctx.stroke();
+
+    }
+
+
+    /* PLAYER */
+
+    if (
+        player.inv % 10 < 5 ||
+        player.inv === 0
+    ) {
+
+        ctx.fillStyle =
+            "#39e75f";
+
+
+        ctx.fillRect(
+            player.x,
+            player.y,
+            player.w,
+            player.h
+        );
+
+
+        /* Eyes */
+
+        ctx.fillStyle =
+            "#111";
+
+
+        ctx.fillRect(
+            player.x + 7,
+            player.y + 9,
+            7,
+            7
+        );
+
+
+        ctx.fillRect(
+            player.x + 23,
+            player.y + 9,
+            7,
+            7
+        );
+
+    }
+
+
+    ctx.restore();
+
+
+    /* HUD */
+
+    document.getElementById(
+        "lives"
+    ).textContent = lives;
+
+
+    document.getElementById(
+        "score"
+    ).textContent = score;
+
+
+    document.getElementById(
+        "lvl"
+    ).textContent = level;
+
+
+    document.getElementById(
+        "time"
+    ).textContent =
+        Math.ceil(timeLeft);
+
+}
+
+
+/* =========================================================
+   MENU
+========================================================= */
+
+function hideMenu() {
+
+    document.getElementById(
+        "menu"
+    ).style.display = "none";
+
+}
+
+
+function showMenu(
+    title,
+    text,
+    button
+) {
+
+    paused = true;
+
+
+    document.getElementById(
+        "title"
+    ).textContent = title;
+
+
+    document.getElementById(
+        "text"
+    ).textContent = text;
+
+
+    document.getElementById(
+        "start"
+    ).textContent = button;
+
+
+    document.getElementById(
+        "menu"
+    ).style.display = "flex";
+
+
+    document.getElementById(
+        "start"
+    ).onclick = function() {
+
+        hideMenu();
+
+        paused = false;
+
+    };
+
+}
+
+
+/* =========================================================
+   GAME OVER
+========================================================= */
+
+function gameOver() {
+
+    playing = false;
+
+
+    showMenu(
+        "GAME OVER 💀",
+        "Level: " +
+        level +
+        "/10 | Score: " +
+        score,
+        "TRY AGAIN"
+    );
+
+
+    document.getElementById(
+        "start"
+    ).onclick = resetGame;
+
+}
+
+
+/* =========================================================
+   WIN
+========================================================= */
+
+function winGame() {
+
+    playing = false;
+
+
+    showMenu(
+        "🏆 YOU WIN!",
+        "সব ১০টি Level শেষ! Final Score: " +
+        score,
+        "PLAY AGAIN"
+    );
+
+
+    document.getElementById(
+        "start"
+    ).onclick = resetGame;
+
+}
+
+
+/* =========================================================
+   PAUSE
+========================================================= */
+
+function togglePause() {
+
+    if (!playing)
+        return;
+
+
+    paused = !paused;
+
+
+    document.getElementById(
+        "pause"
+    ).textContent =
+        paused
+        ? "RESUME"
+        : "PAUSE";
+
+}
+
+
+document.getElementById(
+    "pause"
+).onclick = togglePause;
+
+
+/* =========================================================
+   TIMER
+========================================================= */
+
+setInterval(
+    function() {
+
+        if (
+            playing &&
+            !paused
+        ) {
+
+            timeLeft--;
+
+
+            if (
+                timeLeft <= 0
+            ) {
+
+                gameOver();
+
+            }
+
+        }
+
+    },
+    1000
+);
+
+
+/* =========================================================
+   MAIN LOOP
+========================================================= */
+
+function gameLoop() {
+
+    updatePhysics();
+
+    draw();
+
+    requestAnimationFrame(
+        gameLoop
+    );
+
+}
+
+
+/* INITIAL LEVEL */
+
+buildLevel(1);
+
+gameLoop();
+
+
+/* START BUTTON */
+
+document.getElementById(
+    "start"
+).onclick = resetGame;
+
+</script>
+
+</body>
+</html>
